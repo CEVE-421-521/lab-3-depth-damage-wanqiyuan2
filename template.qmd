@@ -1,7 +1,7 @@
 ---
 title: "Lab 3: Depth-Damage Models"
 subtitle: "DataFrames and Distributions"
-author: "Your Name"
+author: "Wanqi Yuan"
 date: 2024-01-26
 week: 3
 categories: [Lab]
@@ -57,9 +57,79 @@ Plots.default(; margin=6Plots.mm)
 ```
 
 # Site information
-
+Location : 29°18'33"N 94°47'34"W
+Elevation (From Google Earth): 1.17m 
 # Depth-Damage
+Chosen Depth-Damage Fn: Galveston,"two story, no basement,
 
+Code below gets Depth Damage Function
+```{julia}
+# Grabbing Depth Damage 
+haz_fl_dept = CSV.read("data/haz_fl_dept.csv", DataFrame)
+include("depthdamage.jl")
+```
+```{julia}
+data_row = @rsubset(
+    haz_fl_dept, :Description == "two story, no basement, Contents", :Source == "USACE - Galveston"
+)[
+    1, :,
+]
+dd = DepthDamageData(data_row)
+
+fieldnames(typeof(dd))
+```
+
+```{julia}
+scatter(
+    dd.depths,
+    dd.damages;
+    xlabel="Flood Depth at House",
+    ylabel="Damage (%)",
+    label="$(dd.description) ($(dd.source))",
+    legend=:bottomright,
+    size=(700, 500),
+)
+
+```
+
+```{julia}
+function get_depth_damage_function(
+    depth_train::Vector{<:T}, dmg_train::Vector{<:AbstractFloat}
+) where {T<:Unitful.Length}
+
+    # interpolate
+    depth_ft = ustrip.(u"ft", depth_train)
+    interp_fn = Interpolations.LinearInterpolation(
+        depth_ft,
+        dmg_train;
+        extrapolation_bc=Interpolations.Flat(),
+    )
+
+    damage_fn = function (depth::T2) where {T2<:Unitful.Length}
+        return interp_fn(ustrip.(u"ft", depth))
+    end
+    return damage_fn
+end
+
+damage_fn = get_depth_damage_function(dd.depths, dd.damages)
+```
 # Expected annual damages
+```{julia}
+gauge_dist = GeneralizedExtremeValue(5, 1.5, 0.1)
 
+# adjust for elevation
+offset = 3.84 # house is 3.84 feet above gauge
+house_dist = GeneralizedExtremeValue(gauge_dist.μ - offset, gauge_dist.σ, gauge_dist.ξ)
+
+# get 1 million samples
+n_samps = rand(house_dist, 1000000)
+n_samps = depths.(n_samps)
+typeof(n_samps)
+# Apply Depth Damage Fn to all samples
+# damages = damage_fn.(n_samps)
+
+# avg_dmg = mean(damages)
+
+# print(avg_dmg)
+```
 # Discussion
