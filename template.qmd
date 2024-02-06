@@ -58,9 +58,11 @@ Plots.default(; margin=6Plots.mm)
 
 # Site information
 Location : 29°18'33"N 94°47'34"W
+
 Elevation (From Google Earth): 1.17m 
+
 # Depth-Damage
-Chosen Depth-Damage Fn: Galveston,"two story, no basement,
+
 
 Code below gets Depth Damage Function
 ```{julia}
@@ -113,6 +115,23 @@ end
 
 damage_fn = get_depth_damage_function(dd.depths, dd.damages)
 ```
+```{julia}
+p = let
+    depths = uconvert.(u"ft", (-7.0u"ft"):(1.0u"inch"):(30.0u"ft"))
+    damages = damage_fn.(depths)
+    scatter(
+        depths,
+        damages;
+        xlabel="Flood Depth",
+        ylabel="Damage (%)",
+        label="$(dd.description) ($(dd.source))",
+        legend=:bottomright,
+        size=(800, 400),
+        linewidth=2,
+    )
+end
+p
+```
 # Expected annual damages
 ```{julia}
 gauge_dist = GeneralizedExtremeValue(5, 1.5, 0.1)
@@ -123,13 +142,25 @@ house_dist = GeneralizedExtremeValue(gauge_dist.μ - offset, gauge_dist.σ, gaug
 
 # get 1 million samples
 n_samps = rand(house_dist, 1000000)
-n_samps = depths.(n_samps)
+n_samps *=1u"ft"
+# samps_ft = ustrip.(u"ft", n_samps)
 typeof(n_samps)
 # Apply Depth Damage Fn to all samples
-# damages = damage_fn.(n_samps)
 
-# avg_dmg = mean(damages)
 
-# print(avg_dmg)
+damages = damage_fn.(n_samps)
+
+avg_dmg = mean(damages)
+
+print(avg_dmg)
 ```
 # Discussion
+Chosen Depth-Damage Fn: Galveston,"two story, no basement,"
+
+This is appropriate because the selected site
+has the listed characteristics and is in 
+Galveston. 
+
+Average Damage:
+The Average damage being 29.9% means that this property is projected to receive 29.9% 
+damage in any given year with the given pdf for hazard (water level). 
